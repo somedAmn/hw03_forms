@@ -2,6 +2,8 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 
+from yatube.settings import PAGINATOR_COUNT
+
 from .forms import PostForm
 from .models import Group, Post, User
 
@@ -10,7 +12,7 @@ def index(request):
     template = 'posts/index.html'
 
     post_list = Post.objects.all()
-    paginator = Paginator(post_list, 10)
+    paginator = Paginator(post_list, PAGINATOR_COUNT)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
@@ -25,7 +27,7 @@ def group_posts(request, slug):
     group = get_object_or_404(Group, slug=slug)
 
     post_list = Post.objects.filter(group=group)
-    paginator = Paginator(post_list, 10)
+    paginator = Paginator(post_list, PAGINATOR_COUNT)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
@@ -42,7 +44,7 @@ def profile(request, username):
 
     post_list = Post.objects.filter(author=profile)
     post_count = post_list.count()
-    paginator = Paginator(post_list, 10)
+    paginator = Paginator(post_list, PAGINATOR_COUNT)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
@@ -71,16 +73,14 @@ def post_detail(request, post_id):
 @login_required
 def post_create(request):
     template = 'posts/create_post.html'
+    form = PostForm(request.POST or None)
 
-    if request.method == 'POST':
-        form = PostForm(request.POST)
-        if form.is_valid():
-            post = form.save(commit=False)
-            post.author = request.user
-            post.save()
-            return redirect('posts:profile', post.author)
+    if request.method == 'POST' and form.is_valid():
+        post = form.save(commit=False)
+        post.author = request.user
+        post.save()
+        return redirect('posts:profile', post.author)
 
-    form = PostForm()
     context = {
         'form': form,
     }
@@ -95,16 +95,13 @@ def post_edit(request, post_id):
     if request.user != post.author:
         return redirect('posts:post_detail', post_id)
 
-    if request.method == 'POST':
-        form = PostForm(request.POST)
-        if form.is_valid():
-            update_post = form.save(commit=False)
-            post.text = update_post.text
-            post.group = update_post.group
-            post.save()
-            return redirect('posts:post_detail', post_id)
+    form = PostForm(request.POST or None, instance=post)
     is_edit = True
-    form = PostForm(instance=post)
+
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        return redirect('posts:post_detail', post_id)
+
     context = {
         'is_edit': is_edit,
         'form': form,
